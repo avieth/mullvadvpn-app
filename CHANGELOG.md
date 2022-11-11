@@ -23,6 +23,147 @@ Line wrap the file at 100 chars.                                              Th
 
 
 ## [Unreleased]
+- Add a trusted DNS option
+
+### Security
+#### Windows
+- DNS loopback traffic is no longer blocked. Note that local resolvers are still unable to forward
+  queries to servers that would normally be blocked.
+
+
+## [android/2022.2] - 2022-10-17
+Identical to android/2022.2-beta2 except for updated translations.
+
+
+## [2022.5] - 2022-10-14
+### Fixed
+#### Linux
+- Don't prevent early boot service from running if logging to a file fails.
+
+
+## [2022.5-beta2] - 2022-10-05
+### Added
+- Add custom option to WireGuard port selector.
+
+#### Linux
+- Add ARM64 (aarch64) builds. This is the first release with Linux ARM support.
+
+### Changed
+- Experimental: Upgrade the support for quantum-resistant WireGuard tunnels to a newer protocol.
+
+### Fixed
+- Reset known location when connecting to a custom relay.
+
+#### Linux
+- Fix app crashing immediately when using some icon themes.
+
+
+## [2022.5-beta1] - 2022-09-26
+### Added
+- Add obfuscation settings under "WireGuard settings".
+
+#### Windows
+- The default VPN protocol is slowly being changed from OpenVPN to WireGuard.
+  The app fetches the ratio between the protocols from the API.
+
+#### Linux
+- GUI: Add electron flags to run Wayland native if in a compositor/desktop known to work well
+- Add support for Linux ARM64. No installers are produced yet. But the source code can now
+  be built for ARM64.
+
+### Changed
+- Reject invalid WireGuard ports in the CLI.
+- Reorganize settings into more logical categories.
+- Upgrade wireguard-go to 20220703234212 (Windows: v0.5.3).
+- Prune bridges far away from the selected relay.
+- Stay connected when desktop app is killed or crashes. The only situation where the app now
+  disconnects on quit is when the user presses the quit button.
+- Update Electron from 18.0.3 to 19.0.13.
+- Expand allowed range of multicast destinations to include all of `239.0.0.0/8` (administratively
+  scoped addresses), when local network sharing is enabled.
+- Default to selecting Sweden as the entry location when using WireGuard multihop. Previously,
+  a random location was used.
+
+#### Windows
+- Remove dependency on `ipconfig.exe`. Call `DnsFlushResolverCache` to flush the DNS cache.
+- Upgrade Wintun to 0.14.1.
+
+#### Linux
+- The daemon binary and systemd unit file will now be placed in `/usr/bin/` and
+  `/usr/lib/systemd/system` respectively, to aid with starting the system service on systems where
+  `/opt` isn't mounted during early boot.
+
+### Fixed
+- Connect to TCP endpoints over IPv6 if IPv6 is enabled for WireGuard.
+- Fix udp2tcp not working when quantum-resistant tunnels are enabled.
+- Quit app gracefully if renderer process is killed or crashes.
+- Enable reconnect in blocked state in desktop app.
+- Fix error handling during device removal in the desktop app.
+- Enable interface settings when app is logged out
+- Fix 'mullvad status -v' to include the port of the endpoint when connecting over TCP.
+- Check whether the device is valid when reconnecting from the error state.
+- Stop reconnecting when the account has run out of time.
+
+#### Windows
+- Only use the most recent list of apps to split when resuming from hibernation/sleep if applying
+  it was successful.
+- Don't fail install if the device tree contains nameless callout driver devices.
+
+### Security
+- When the system service is being shut down and the target state is _secured_, maintain the
+  blocking firewall rules. Unless it's possible to deduce that the system isn't shutting down and the
+  system service is being stopped by the user intentionally. This is to prevent leaks that might
+  occur during system shutdown. Fixes 2022 Mullvad app audit issue item `MUL22-02`.
+
+#### Windows
+- Upgrade win-split-tunnel driver to version 1.2.2.0. Fixes incomplete validation of input buffers
+  that could result in out-of-bounds reads. Fixes 2022 Mullvad app audit issue item `MUL22-01`.
+
+#### Linux
+- Added traffic blocking during early boot, before the daemon starts, to prevent leaks in the case
+  that the system service starts after a networking daemon has already configured a network
+  interface.
+
+
+## [android/2022.2-beta2] - 2022-09-09
+### Changed
+#### Android
+- Refresh device data when opening the account view to ensure the local data is up-to-date and that
+  the device hasn't been revoked.
+- Disable settings button during login.
+
+### Fixed
+#### Android
+- Fix crash sometimes occurring during account creation.
+- Fix tunnel info expansion state not remembered during pause and resume.
+- Fix crash during some view transitions.
+- Fix disabled login button on login failure. Instead, the login button will now still be enabled
+  on login failures to let the user re-attempt the login.
+
+
+## [2022.4] - 2022-08-19
+### Added
+#### Windows
+- Windows daemon now looks up the MTU on the default interface and uses this MTU instead of the
+  default 1500. The 1500 is still the fallback if this for some reason fails. This may stop
+  fragmentation.
+
+### Fixed
+#### Linux
+- Fix issue where MTU could not be manually set in the app.
+- Lower the max MTU from the automatic MTU detection down to 1380,
+  which was the hardcoded default before the automatic detection was implemented.
+  This solves issues where the physical interface MTU was set higher than it could
+  actually transport.
+
+
+## [android/2022.2-beta1] - 2022-08-11
+### Added
+#### Android
+- Add device management to the Android app. This simplifies knowing which device is which and adds
+  the option to log other devices out when the account already has five devices.
+
+>>>>>>> 9fe6a67ca (trusted DNS servers option)
 ### Changed
 #### Android
 - Lowered default MTU to 1280 on Android.

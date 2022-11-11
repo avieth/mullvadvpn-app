@@ -44,7 +44,7 @@ use mullvad_types::{
     location::GeoIpLocation,
     relay_constraints::{BridgeSettings, BridgeState, ObfuscationSettings, RelaySettingsUpdate},
     relay_list::RelayList,
-    settings::{DnsOptions, Settings},
+    settings::{DnsOptions, TrustedDnsOptions, Settings},
     states::{TargetState, TunnelState},
     version::{AppVersion, AppVersionInfo},
     wireguard::{PublicKey, RotationInterval},
@@ -222,6 +222,8 @@ pub enum DaemonCommand {
     SetEnableIpv6(ResponseTx<(), settings::Error>, bool),
     /// Set DNS options or servers to use
     SetDnsOptions(ResponseTx<(), settings::Error>, DnsOptions),
+    /// Set trusted DNS servers
+    SetTrustedDnsOptions(ResponseTx<(), settings::Error>, TrustedDnsOptions),
     /// Toggle macOS network check leak
     /// Set MTU for wireguard tunnels
     SetWireguardMtu(ResponseTx<(), settings::Error>, Option<u16>),
@@ -650,6 +652,7 @@ where
                 allow_lan: settings.allow_lan,
                 block_when_disconnected: settings.block_when_disconnected,
                 dns_servers: dns::addresses_from_options(&settings.tunnel_options.dns_options),
+                trusted_dns_servers: Vec::new(),
                 allowed_endpoint: initial_api_endpoint,
                 reset_firewall: *target_state != TargetState::Secured,
                 #[cfg(windows)]
@@ -980,6 +983,7 @@ where
             SetBridgeState(tx, bridge_state) => self.on_set_bridge_state(tx, bridge_state).await,
             SetEnableIpv6(tx, enable_ipv6) => self.on_set_enable_ipv6(tx, enable_ipv6).await,
             SetDnsOptions(tx, dns_servers) => self.on_set_dns_options(tx, dns_servers).await,
+            SetTrustedDnsOptions(tx, dns_servers) => self.on_set_trusted_dns_options(tx, dns_servers).await,
             SetWireguardMtu(tx, mtu) => self.on_set_wireguard_mtu(tx, mtu).await,
             SetWireguardRotationInterval(tx, interval) => {
                 self.on_set_wireguard_rotation_interval(tx, interval).await
@@ -1979,6 +1983,33 @@ where
             }
         }
     }
+
+    async fn on_set_trusted_dns_options(
+        &mut self,
+        tx: ResponseTx<(), settings::Error>,
+        trusted_dns_options: TrustedDnsOptions,
+    ) {
+        let save_result = self.settings.set_trusted_dns_options(trusted_dns_options.clone()).await;
+        match save_result {
+            Ok(settings_changed) => {
+                Self::oneshot_send(tx, Ok(()), "set_trusted_dns_options response");
+                if settings_changed {
+                    let settings = self.settings.to_settings();
+                    let resolvers = settings.tunnel_options.trusted_dns_options.addresses.clone();
+                    self.parameters_generator
+                        .set_tunnel_options(&settings.tunnel_options);
+                    self.event_listener.notify_settings(settings);
+                    self.send_tunnel_command(TunnelCommand::DnsTrust(resolvers));
+                }
+            }
+            Err(e) => {
+                log::error!("{}", e.display_chain_with_msg("Unable to save settings"));
+                Self::oneshot_send(tx, Err(e), "set_trusted_dns_options response");
+            }
+        }
+
+    }
+
 
     async fn on_set_wireguard_mtu(
         &mut self,

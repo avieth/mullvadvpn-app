@@ -95,6 +95,12 @@ pub struct InitialTunnelState {
     pub block_when_disconnected: bool,
     /// DNS servers to use. If `None`, the tunnel gateway is used.
     pub dns_servers: Option<Vec<IpAddr>>,
+    /// DNS servers that will not be blocked by the firewall, but will not be
+    /// used as in the above dns_servers list. So for instance the dns_servers
+    /// list could be None to use the default, but the trusted_dns_servers
+    /// list could include another trusted DNS server that is used for a
+    /// particular domain.
+    pub trusted_dns_servers: Vec<IpAddr>,
     /// A single endpoint that is allowed to communicate outside the tunnel, i.e.
     /// in any of the blocking states.
     pub allowed_endpoint: AllowedEndpoint,
@@ -170,6 +176,9 @@ pub enum TunnelCommand {
     AllowEndpoint(AllowedEndpoint, oneshot::Sender<()>),
     /// Set DNS servers to use.
     Dns(Option<Vec<IpAddr>>),
+    /// Set extra DNS servers to allow to be used (but they are not added to
+    /// the resolver).
+    DnsTrust(Vec<IpAddr>),
     /// Enable or disable the block_when_disconnected feature.
     BlockWhenDisconnected(bool),
     /// Notify the state machine of the connectivity of the device.
@@ -303,6 +312,7 @@ impl TunnelStateMachine {
             block_when_disconnected: settings.block_when_disconnected,
             is_offline,
             dns_servers: settings.dns_servers,
+            trusted_dns_servers: settings.trusted_dns_servers,
             allowed_endpoint: settings.allowed_endpoint,
             tunnel_parameters_generator: Box::new(tunnel_parameters_generator),
             tun_provider: Arc::new(Mutex::new(tun_provider)),
@@ -391,6 +401,12 @@ struct SharedTunnelStateValues {
     is_offline: bool,
     /// DNS servers to use (overriding default).
     dns_servers: Option<Vec<IpAddr>>,
+    /// DNS servers that will not be blocked by the firewall, but will not be
+    /// used as in the above dns_servers list. So for instance the dns_servers
+    /// list could be None to use the default, but the trusted_dns_servers
+    /// list could include another trusted DNS server that is used for a
+    /// particular domain.
+    trusted_dns_servers: Vec<IpAddr>,
     /// Endpoint that should not be blocked by the firewall.
     allowed_endpoint: AllowedEndpoint,
     /// The generator of new `TunnelParameter`s
@@ -440,7 +456,7 @@ impl SharedTunnelStateValues {
 
     pub fn set_dns_servers(
         &mut self,
-        dns_servers: Option<Vec<IpAddr>>,
+        dns_servers: Option<Vec<IpAddr>>
     ) -> Result<bool, ErrorStateCause> {
         if self.dns_servers != dns_servers {
             self.dns_servers = dns_servers.clone();
@@ -467,6 +483,19 @@ impl SharedTunnelStateValues {
         } else {
             Ok(false)
         }
+    }
+
+    pub fn set_trusted_dns_servers(
+        &mut self,
+        addresses: Vec<IpAddr>
+    ) -> Result<bool, ErrorStateCause> {
+        if self.trusted_dns_servers != addresses {
+            self.trusted_dns_servers = addresses;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+
     }
 
     /// NetworkManager's connectivity check can get hung when DNS requests fail, thus the TSM

@@ -638,6 +638,18 @@ impl From<mullvad_types::relay_constraints::RelaySettings> for RelaySettings {
     }
 }
 
+impl From<&mullvad_types::settings::TrustedDnsOptions> for TrustedDnsOptions {
+    fn from(options: &mullvad_types::settings::TrustedDnsOptions) -> Self {
+        TrustedDnsOptions {
+            addresses: options
+                .addresses
+                .iter()
+                .map(|addr| addr.to_string())
+                .collect(),
+        }
+    }
+}
+
 impl From<&mullvad_types::settings::DnsOptions> for DnsOptions {
     fn from(options: &mullvad_types::settings::DnsOptions) -> Self {
         DnsOptions {
@@ -688,6 +700,7 @@ impl From<&mullvad_types::settings::TunnelOptions> for TunnelOptions {
             dns_options: Some(DnsOptions::from(&options.dns_options)),
             #[cfg(target_os = "android")]
             dns_options: None,
+            trusted_dns_options: Some(TrustedDnsOptions { addresses: Vec::new() }),
         }
     }
 }
@@ -1400,6 +1413,11 @@ impl TryFrom<TunnelOptions> for mullvad_types::settings::TunnelOptions {
             .ok_or(FromProtobufTypeError::InvalidArgument(
                 "missing tunnel DNS options",
             ))?;
+        let trusted_dns_options = options
+            .trusted_dns_options
+            .ok_or(FromProtobufTypeError::InvalidArgument(
+                "missing tunnel trusted DNS options",
+            ))?;
 
         Ok(Self {
             openvpn: net::openvpn::TunnelOptions {
@@ -1439,7 +1457,30 @@ impl TryFrom<TunnelOptions> for mullvad_types::settings::TunnelOptions {
             },
             #[cfg(not(target_os = "android"))]
             dns_options: mullvad_types::settings::DnsOptions::try_from(dns_options)?,
+            trusted_dns_options: mullvad_types::settings::TrustedDnsOptions::try_from(trusted_dns_options)?,
         })
+    }
+}
+
+impl TryFrom<TrustedDnsOptions> for mullvad_types::settings::TrustedDnsOptions {
+    type Error = FromProtobufTypeError;
+    fn try_from(options: TrustedDnsOptions) -> Result<Self, Self::Error> {
+        use mullvad_types::settings::{
+            TrustedDnsOptions as MullvadTrustedDnsOptions
+        };
+
+        Ok(MullvadTrustedDnsOptions{
+            addresses: options
+                .addresses
+                .into_iter()
+                .map(|addr| {
+                    addr.parse().map_err(|_| {
+                        FromProtobufTypeError::InvalidArgument("invalid IP address")
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        })
+
     }
 }
 
